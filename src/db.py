@@ -46,6 +46,7 @@ _SQLITE_FILE = "wingman.db"
 # SUPABASE CLIENT HELPERS
 # =============================================================
 
+@st.cache_resource
 def _db() -> "SupabaseClient":
     """
     Return the Supabase client using the anon key.
@@ -54,6 +55,7 @@ def _db() -> "SupabaseClient":
     return create_client(_URL, _KEY)
 
 
+@st.cache_resource
 def _admin_db() -> "SupabaseClient":
     """
     Return the Supabase client using the service-role key.
@@ -293,6 +295,7 @@ def upsert_oauth_user(email: str, name: str, provider: str) -> dict:
     return get_user(email)
 
 
+@st.cache_data(ttl=600)
 def get_user(email: str) -> dict | None:
     """Return a user dict by email, or None if not found."""
     user = None
@@ -530,6 +533,7 @@ def count_registered_users() -> int:
 
 def create_project(user_email: str, name: str) -> dict:
     """Create a new project folder for organizing chats."""
+    st.cache_data.clear()
     if _USE_SUPABASE:
         res = _admin_db().table("projects").insert({
             "user_email": user_email,
@@ -549,6 +553,7 @@ def create_project(user_email: str, name: str) -> dict:
     return {"id": project_id, "user_email": user_email, "name": name}
 
 
+@st.cache_data(ttl=900)
 def get_user_projects(user_email: str) -> list[dict]:
     """Get all projects for a given user."""
     if _USE_SUPABASE:
@@ -567,6 +572,7 @@ def get_user_projects(user_email: str) -> list[dict]:
 
 def delete_project(project_id: int):
     """Delete a project and unassign its chats."""
+    st.cache_data.clear()
     if _USE_SUPABASE:
         # 1. Unassign chats (set project_id to NULL) so they stay in history
         _admin_db().table("chats").update({"project_id": None}).eq("project_id", project_id).execute()
@@ -587,6 +593,9 @@ def delete_project(project_id: int):
 def save_chat(user_email: str, user_input: str,
               ai_response: str, model: str = "claude", project_id: int = None):
     """Save one message exchange (user + AI reply) to the database."""
+    # Bust the chat cache so the new message appears instantly
+    st.cache_data.clear()
+    
     if _USE_SUPABASE:
         data = {
             "user_email":  user_email,
@@ -609,6 +618,7 @@ def save_chat(user_email: str, user_input: str,
     conn.close()
 
 
+@st.cache_data(ttl=300)
 def get_user_chats(user_email: str, project_id: int = None) -> list[dict]:
     """Return all chats for a user, oldest first."""
     if _USE_SUPABASE:
@@ -644,6 +654,7 @@ def get_all_chats_for_user(user_email: str) -> list[dict]:
 
 def delete_user_chats(user_email: str):
     """Delete all chats for a user. Called from the sidebar."""
+    st.cache_data.clear()
     if _USE_SUPABASE:
         _admin_db().table("chats").delete().eq("user_email", user_email).execute()
         return
@@ -686,6 +697,7 @@ def export_all_chats_csv() -> str:
 def save_uploaded_file(user_email: str, file_name: str,
                        file_type: str, extracted_text: str):
     """Save an uploaded file's extracted text to the database."""
+    st.cache_data.clear()
     if _USE_SUPABASE:
         _admin_db().table("uploaded_files").insert({
             "user_email":     user_email,
@@ -705,6 +717,7 @@ def save_uploaded_file(user_email: str, file_name: str,
     conn.close()
 
 
+@st.cache_data(ttl=600)
 def get_uploaded_files(user_email: str) -> list[dict]:
     """Return all files uploaded by a user, newest first."""
     if _USE_SUPABASE:
