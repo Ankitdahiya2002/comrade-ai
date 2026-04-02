@@ -1,0 +1,29 @@
+# GitHub Deployment Plan
+
+The goal is to initialize a Git repository, configure it properly (ignoring unnecessary files), and prepare it for pushing to GitHub.
+
+## User Review Required
+
+- [ ] **GitHub Repository URL**: After the local repository is ready, you'll need to create a new repository on GitHub and provide the URL (e.g., `https://github.com/your-username/wingman-ai.git`).
+
+## Proposed Changes
+
+### [Component Name] [Git Configuration]
+
+#### [MODIFY] [.gitignore](file:///Users/aman/Downloads/wingman_project_folder/.gitignore)
+- Add entries for common Python files and environment folders to keep the repository clean and secure.
+
+#### [NEW] Local Git Repository
+- Initialize git in the project root.
+- Create an initial commit with all relevant files.
+
+## Open Questions
+
+- Should I include any large data files or local `.db` files in the repository? (Currently `.gitignore` ignores `*.db` and `*.sql`).
+- Do you have a specific name for the GitHub repository?
+
+## Verification Plan
+
+### Manual Verification
+- Run `git status` to ensure only intended files are staged.
+- Provide instructions for the user to push to their new GitHub repository.

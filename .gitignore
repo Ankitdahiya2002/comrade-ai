@@ -1,0 +1,23 @@
+# Secrets — NEVER commit these
+.streamlit/secrets.toml
+.env
+
+# Database
+wingman.db
+*.db
+*.sql
+*.corrupt.bak
+
+# Python
+projectenv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# VS Code temp
+tempCodeRunnerFile.py
