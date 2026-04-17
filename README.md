@@ -1,11 +1,11 @@
-# Wingman AI 🤖
+# ComradeAi AI 🤖
 
-Wingman AI is a professional, multi-modal AI chat application built with **Streamlit**, featuring a premium "ChatGPT-style" interface, robust session management, and a flexible backend supporting both Cloud (Supabase) and Local (SQLite) environments.
+ComradeAi AI is a professional, multi-modal AI chat application built with **Streamlit**, featuring a premium "ChatGPT-style" interface, robust session management, and a flexible backend supporting both Cloud (Supabase) and Local (SQLite) environments.
 
 ## 🚀 Key Features
 
 - **Multi-Modal Intelligence**: Seamlessly switch between **Anthropic Claude Sonnet 4** and **Google Gemini 2.5 Flash**.
-- **File Context Analysis**: Upload PDF, DOCX, CSV, or TXT files. Wingman extracts the text and uses it as context for AI responses.
+- **File Context Analysis**: Upload PDF, DOCX, CSV, or TXT files. ComradeAi extracts the text and uses it as context for AI responses.
 - **Image Generation**: Integrated with **Stability AI** to generate high-quality images directly from the chat.
 - **Project Organization**: Group your chats into "Projects" for better workflow management.
 - **Premium UI/UX**: Professional dark/light themes, sticky chat controls, and responsive sidebar.
@@ -39,7 +39,7 @@ The core AI logic in `src/helper.py` follows a priority-based routing:
 ### 3. Data Persistence
 `src/db.py` uses a **polymorphic design**:
 - It checks for Supabase credentials in `secrets.toml`. If present, it uses the Supabase cloud database.
-- If credentials are missing, it automatically falls back to a local `wingman.db` (SQLite), ensuring the app works out-of-the-box.
+- If credentials are missing, it automatically falls back to a local `ComradeAi.db` (SQLite), ensuring the app works out-of-the-box.
 
 ---
 
@@ -52,8 +52,8 @@ The core AI logic in `src/helper.py` follows a priority-based routing:
 ### Steps
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-username/wingman-ai.git
-   cd wingman-ai
+   git clone https://github.com/your-username/ComradeAi-ai.git
+   cd ComradeAi-ai
    ```
 
 2. **Create a virtual environment**:
@@ -88,4 +88,5 @@ The core AI logic in `src/helper.py` follows a priority-based routing:
 ---
 
 ## 📜 License
-Internal use only. Part of the Wingman project suite.
+Internal use only. Part of the ComradeAi project suite.
+Developed by ANKIT DAHIYA
