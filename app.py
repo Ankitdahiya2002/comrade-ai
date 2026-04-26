@@ -40,28 +40,14 @@ from src.file_reader import extract_file
 # =============================================================
 
 st.set_page_config(
-    page_title="comrade AI",
+    page_title="Comrade Ai",
     page_icon="✈️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # =============================================================
-# FRAGMENT -> QUERY WORKAROUND (for Google OAuth)
-# =============================================================
-# Streamlit cannot natively read fragments (#access_token=...), 
-# so we use a component to inject JS to convert it and reload.
-import streamlit.components.v1 as components
-components.html("""
-<script>
-    const hash = window.parent.location.hash;
-    if (hash && (hash.includes('access_token=') || hash.includes('id_token='))) {
-        // Convert '#' to '?' and reload the parent window
-        const newUrl = window.parent.location.href.split('#')[0] + '?' + hash.substring(1);
-        window.parent.location.href = newUrl;
-    }
-</script>
-""", height=0)
+
 
 # Initialise the database tables on every cold start
 safe_initialize()
@@ -81,7 +67,7 @@ _DEFAULTS = {
     "show_welcome":     True,   # show "Ready when you are" on first open
     "pending_prompt":   "",     # pre-filled prompt from a recommendation card
     # Auth state — must be initialised before auth_page() is called
-    "auth_mode":        "login",
+    "auth_mode":        "landing",
     "auth_role":        "user",
     "prefill_email":    "",
     "otp_phone":        "",
@@ -93,6 +79,7 @@ _DEFAULTS = {
     "show_new_project_input": False,
     # Chat filter — which conversation is selected from sidebar
     "active_chat_filter":     None,
+    "active_chat_id":          None,
 }
 
 for key, default in _DEFAULTS.items():
@@ -104,12 +91,17 @@ for key, default in _DEFAULTS.items():
 # THEME CSS  — professional dark / light, ChatGPT-style
 # =============================================================
 
-def _apply_theme_css():
+def _apply_theme_css(img_b64="", bg_b64="", is_admin: bool = False):
     """
     Inject all CSS into the page.
-    Colours adapt to the current theme (dark / light).
+    Propagates the premium Comrade AI theme to the main app dashboard.
     """
-    dark = st.session_state.theme == "dark"
+    dark = True # Main app is always dark for premium consistency
+    
+    # Success Cyan Theme for the Main App
+    GLOW = "rgba(6, 182, 212, 0.6)"
+    TINT = "rgba(6, 182, 212, 0.15)"
+    PRI  = "#06b6d4"
 
     # Colour tokens
     BG       = "#0a0a0f" if dark else "#f5f5fb"
@@ -137,18 +129,40 @@ def _apply_theme_css():
 <style>
 
 /* ── Base + all containers ── */
-html, body,
-[data-testid="stAppViewContainer"],
+[data-testid="stAppViewContainer"] {{
+    background: #020617 !important;
+    background-image: 
+        url("data:image/png;base64,{bg_b64 if bg_b64 else img_b64}"),
+        radial-gradient(circle at center, {GLOW}, transparent 80%),
+        linear-gradient({TINT}, rgba(2, 6, 23, 0.98)) !important;
+    background-size: cover !important;
+    background-position: center center !important;
+    background-attachment: fixed !important;
+    color: #ffffff !important;
+}}
+
 [data-testid="stMainBlockContainer"],
 [data-testid="stMain"],
-[data-testid="block-container"],
 [data-testid="stVerticalBlock"],
 [data-testid="stHorizontalBlock"],
-.main, .block-container {{
-    background: {BG} !important;
-    color: {TX} !important;
+.main {{
+    background: transparent !important;
+    color: #ffffff !important;
     font-family: 'Inter', -apple-system, sans-serif !important;
     transition: background 0.4s ease, color 0.3s ease;
+}}
+[data-testid="block-container"],
+.block-container {{
+    padding: 1rem !important;
+}}
+
+/* ── Sidebar Navigation Toggle (Keep Visible) ── */
+header {{ background: transparent !important; }}
+[data-testid="stHeader"] {{ background: transparent !important; }}
+.stAppDeployButton, [data-testid="stStatusWidget"], [data-testid="stToolbar"] {{ display: none !important; }}
+[data-testid="stSidebarCollapseButton"] {{
+    height: 0.75rem !important;
+    min-height: 24px !important;
 }}
 
 /* ── Columns and expanders ── */
@@ -161,35 +175,73 @@ html, body,
     border-radius: 12px !important;
 }}
 
-/* ── Animated mesh gradient background ── */
-[data-testid="stAppViewContainer"]::before {{
-    content: '';
-    position: fixed;
-    inset: 0;
-    background:
-        radial-gradient(ellipse 80% 50% at 20% -10%, {GLOW_GRN} 0%, transparent 60%),
-        radial-gradient(ellipse 60% 40% at 85% 110%, {GLOW_PRP} 0%, transparent 55%);
-    pointer-events: none;
-    z-index: 0;
-    animation: meshPulse 10s ease-in-out infinite alternate;
+/* ── Welcome Screen Typrography ── */
+.welcome-title {{
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-size: 4rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+    background: linear-gradient(135deg, #ffffff 0%, {PRI} 100%);
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    margin-bottom: 0.5rem !important;
+    text-align: center !important;
+    margin-top: 0rem !important;
 }}
-@keyframes meshPulse {{
-    from {{ opacity: 0.6; }}
-    to   {{ opacity: 1.0; }}
+.welcome-sub {{
+    font-family: 'Inter', sans-serif !important;
+    font-size: 1.5rem !important;
+    font-weight: 300 !important;
+    color: {TX2} !important;
+    text-align: center !important;
+    letter-spacing: 0.5em !important;
+    text-transform: uppercase !important;
+    margin-top: 1rem;
+}}
+
+/* ── Animated Hero UFO ── */
+@keyframes floatUfo {{
+    0% {{ transform: translateY(0) rotate(0deg) scale(1); filter: drop-shadow(0 0 20px {PRI}44); }}
+    25% {{ transform: translateY(-20px) rotate(90deg) scale(1.05); filter: drop-shadow(0 0 40px {PRI}66); }}
+    50% {{ transform: translateY(0) rotate(180deg) scale(1); filter: drop-shadow(0 0 20px {PRI}44); }}
+    75% {{ transform: translateY(20px) rotate(270deg) scale(0.95); filter: drop-shadow(0 0 40px {PRI}66); }}
+    100% {{ transform: translateY(0) rotate(360deg) scale(1); filter: drop-shadow(0 0 20px {PRI}44); }}
+}}
+.hero-ufo-container {{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 4rem 0;
+    perspective: 1000px;
+}}
+.hero-ufo {{
+    width: 280px;
+    animation: floatUfo 12s infinite linear;
+    filter: drop-shadow(0 0 20px {PRI}44);
+    pointer-events: none;
+    transform-style: preserve-3d;
 }}
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] > div:first-child {{
-    background: {BG2} !important;
-    border-right: 1px solid {BORDER} !important;
-    backdrop-filter: blur(20px) !important;
+    background: rgba(15, 23, 42, 0.7) !important;
+    border-right: 1px solid {PRI}44 !important;
+    backdrop-filter: blur(25px) !important;
+    box-shadow: 10px 0 30px rgba(2, 6, 23, 0.5);
+    padding-top: 1rem !important;
+    padding-bottom: 0rem !important;
 }}
 [data-testid="stSidebar"] * {{ color: {TX} !important; }}
 [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{
-    gap: 0.05rem !important;
+    gap: 0rem !important;
 }}
 [data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {{
     padding: 0 !important;
+    margin: 0 !important;
+}}
+[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div {{
+    padding-top: 0 !important;
+    padding-bottom: 0.1rem !important;
 }}
 [data-testid="stSidebar"] hr {{
     margin: 5px 0 !important;
@@ -212,12 +264,27 @@ html, body,
 /* Sidebar Sticky Fixed Bottom Wrapper */
 .sidebar-bottom-sticky {{
     position: fixed;
-    bottom: 0px;
-    width: 17.5rem; /* Matches sidebar default responsive width better */
+    bottom: 0px !important;
+    left: 0px !important;
+    width: 250px !important; /* Fixed width of the sidebar nav container */
     z-index: 1000;
-    background: #111111;
-    padding: 10px 15px 20px 15px;
+    background: rgba(15, 23, 42, 0.98);
+    backdrop-filter: blur(20px);
+    padding: 12px 15px 12px 15px !important;
     border-top: 1px solid rgba(255,255,255,0.07);
+}}
+.sidebar-footer-link {{
+    text-decoration: none !important;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px !important;
+    color: {TX2} !important;
+    padding: 6px 0;
+    transition: color 0.2s;
+}}
+.sidebar-footer-link:hover {{
+    color: #ffffff !important;
 }}
 @media (max-width: 768px) {{
     .sidebar-bottom-sticky {{ width: 100%; }}
@@ -232,6 +299,25 @@ html, body,
 .project-row .stButton > button {{
     flex-grow: 1 !important;
 }}
+/* ── STICKY BOTTOM INPUT BAR ── */
+[data-testid="stVerticalBlock"] > div:has(.chat-spacer) {{
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 336px !important; /* Standard Streamlit sidebar width */
+    width: calc(100% - 336px) !important;
+    background: #0a0a0f !important;
+    z-index: 999 !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+}}
+
+/* For mobile / collapsed sidebar */
+[data-testid="stSidebar"][aria-expanded="false"] + section [data-testid="stVerticalBlock"] > div:has(.chat-spacer) {{
+    left: 0 !important;
+    width: 100% !important;
+}}
+
+.chat-spacer {{ height: 0px !important; display: none; }}
 .project-delete-btn .stButton > button {{
     width: 28px !important;
     min-width: 28px !important;
@@ -374,7 +460,7 @@ html, body,
 }}
 /* Adjust input padding for model chip, without relying on the removed anchor */
 .stTextInput input {{
-    padding-left: 115px !important;
+    padding-left: {"115px" if is_admin else "50px"} !important;
 }}
 
 /* ── Popover Trigger (Attach File) ── */
@@ -588,11 +674,14 @@ hr {{ border-color: {BORDER} !important; }}
     background-clip: text;
 }}
 .welcome-sub {{
-    font-size: 15px;
-    color: {TX2};
+    font-size: 16.5px;
+    background: linear-gradient(135deg, {TX} 0%, {ACCENT} 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
     text-align: center;
     margin-bottom: 32px;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.05em;
+    font-weight: 600;
 }}
 
 /* ── Recommendation cards ── */
@@ -618,10 +707,19 @@ hr {{ border-color: {BORDER} !important; }}
 /* ── Footer disclaimer ── */
 .chat-footer {{
     text-align: center;
+    padding: 10px 0 5px;
     font-size: 11px;
-    color: #aaa;
-    padding-top: 10px;
-    font-family: 'Inter', sans-serif !important;
+    color: rgba(200,200,220,0.3) !important;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.01em;
+}}
+[data-testid="stFooter"] {{ visibility: hidden; height: 0px !important; }}
+
+/* ── Divider — hide the ugly default hr ── */
+hr {{
+    border: none !important;
+    border-top: 1px solid rgba(255,255,255,0.05) !important;
+    margin: 0.5rem 0 !important;
 }}
 
 /* ── Scrollbar ── */
@@ -643,27 +741,52 @@ hr {{ border-color: {BORDER} !important; }}
     box-shadow: 0 0 12px rgba(83,70,218,0.35);
 }}
 
-/* ── Sticky Bottom Footer ── */
-/* Targets the specific vertical block whose VERY FIRST element-container has the sticky anchor */
-[data-testid="stVerticalBlock"]:has(> div.element-container:nth-child(1) #sticky-anchor) {{
+/* ── Message input bar — ChatGPT pill look ── */
+[data-testid="stMainBlockContainer"] .stTextInput > div > div > input {{
+    background: #1e1e2e !important;
+    border: 1.5px solid rgba(255,255,255,0.12) !important;
+    border-radius: 30px !important;
+    color: #ececec !important;
+    -webkit-text-fill-color: #ececec !important;
+    font-size: 15px !important;
+    font-family: 'Inter', sans-serif !important;
+    padding: 16px 80px 16px 50px !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+}}
+[data-testid="stMainBlockContainer"] .stTextInput > div > div > input:focus {{
+    border-color: rgba(25,195,125,0.4) !important;
+    box-shadow: 0 0 0 3px rgba(25,195,125,0.08) !important;
+    background: #1e1e2e !important;
+}}
+[data-testid="stMainBlockContainer"] .stTextInput > div > div > input::placeholder {{
+    color: #8e8ea0 !important;
+}}
+
+/* ── Sticky chat bar container ── */
+[data-testid="stVerticalBlock"] > div:has(.chat-spacer) {{
     position: fixed !important;
-    bottom: 20px !important; /* Slightly up from absolute bottom */
-    z-index: 99999 !important;
+    bottom: 0 !important;
+    left: 336px !important;
+    width: calc(100% - 336px) !important;
+    background: linear-gradient(to top, #0a0a0f 60%, transparent) !important;
+    z-index: 999 !important;
+    padding: 16px 24px 12px !important;
+}}
+[data-testid="stSidebar"][aria-expanded="false"] + section [data-testid="stVerticalBlock"] > div:has(.chat-spacer) {{
+    left: 0 !important;
     width: 100% !important;
-    max-width: 48rem !important;
-    background: transparent !important; /* Allow the bubbles/gradient to show */
-    padding: 0 !important;
-    margin-bottom: 0 !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
 }}
-/* Inner container for background effect */
-[data-testid="stVerticalBlock"]:has(> div.element-container:nth-child(1) #sticky-anchor) > div {{
-    background: linear-gradient(180deg, rgba(10,10,15,0) 0%, rgba(10,10,15,1) 40%) !important;
-    backdrop-filter: blur(12px) !important;
-    padding: 20px 0 !important;
+.chat-spacer {{ height: 130px; display: block !important; }}
+
+/* ── Footer ── */
+.chat-footer {{
+    text-align: center;
+    padding: 8px 0 2px;
+    font-size: 11px;
+    color: rgba(200,200,220,0.25) !important;
+    font-family: 'Inter', sans-serif;
 }}
-.chat-spacer {{ height: 260px; }}
+[data-testid="stFooter"] {{ visibility: hidden; height: 0px !important; }}
 
 </style>
 """, unsafe_allow_html=True)
@@ -680,15 +803,17 @@ def _render_sidebar(user_email: str, user_name: str):
 
         # ── Logo ──────────────────────────────────────────────
         st.markdown('<div class="sidebar-nav-btn">', unsafe_allow_html=True)
-        if st.button("🤖 Wingman AI", key="home_logo", use_container_width=True):
+        if st.button("🪐 Comrade Ai", key="home_logo", use_container_width=True):
             _reset_to_welcome()
         st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown('<div style="height:4px"></div>', unsafe_allow_html=True)
 
         # ── Navigation ────────────────────────────────────────
-        if st.button("📝  New chat", key="new_chat", use_container_width=True):
-            _reset_to_welcome()
+        if st.button("🛫  New chat", key="new_chat", use_container_width=True):
+            st.session_state.active_chat_id = None
+            st.session_state.show_welcome     = True
+            st.session_state.active_file_name = None
+            st.session_state.active_file_text = None
+            st.rerun()
 
         if st.button("🔍  Search chats", key="btn_search_toggle", use_container_width=True):
             st.session_state.show_sidebar_search = not st.session_state.show_sidebar_search
@@ -696,8 +821,6 @@ def _render_sidebar(user_email: str, user_name: str):
 
         if st.session_state.show_sidebar_search:
             st.session_state.sidebar_search_query = st.text_input("Search", placeholder="Type to filter chats...", label_visibility="collapsed")
-            
-        st.markdown("<br>", unsafe_allow_html=True)
 
         # ── Projects ──────────────────────────────────────
         st.caption("Projects")
@@ -744,8 +867,6 @@ def _render_sidebar(user_email: str, user_name: str):
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-
         # ── Chat history ──────────────────────────────────────
         st.caption("Your chats")
 
@@ -764,21 +885,45 @@ def _render_sidebar(user_email: str, user_name: str):
         else:
             chats = all_chats
 
-        # Deduplicate
-        seen, history = set(), []
-        for chat in reversed(chats):
-            title = chat["user_input"][:45]
-            if title not in seen:
-                seen.add(title)
-                history.append({
-                    "title": title,
-                    "ts":    str(chat.get("timestamp", ""))[:10],
-                })
+        # Group into conversations
+        # dict: { conversation_id: { 'title': str, 'ts': str } }
+        conv_map = {}
+        for chat in all_chats:
+            cid = chat.get("conversation_id")
+            if not cid:
+                cid = "legacy_" + str(chat["id"]) # Handle older messages
+                
+            # If we haven't seen this CID yet, it's the "latest" one for it (since all_chats is DESC)
+            if cid not in conv_map:
+                conv_map[cid] = {
+                    "title": chat["user_input"][:45],
+                    "ts":    str(chat.get("timestamp", ""))[:19],
+                    "id":    cid
+                }
+        
+        # Sort conversations by timestamp DESC
+        history = sorted(conv_map.values(), key=lambda x: x["ts"], reverse=True)
 
         for item in history[:15]:
-            label = item["title"] + ("…" if len(item["title"]) == 45 else "")
-            if st.button(label, key=f"hist_{item['title'][:18]}_{item['ts']}", use_container_width=True, help=item["ts"]):
-                st.session_state.show_welcome = False
+            # Convert timestamp to IST for display
+            try:
+                from datetime import datetime, timedelta
+                dt_str = item["ts"].replace(' ', 'T')
+                dt = datetime.fromisoformat(dt_str)
+                ist_dt = dt + timedelta(hours=5, minutes=30)
+                display_ts = ist_dt.strftime("%b %d, %H:%M")
+            except:
+                display_ts = item["ts"][:10]
+                
+            label  = item["title"] + ("…" if len(item["title"]) == 45 else "")
+            is_active = st.session_state.active_chat_id == item["id"]
+            
+            # Highlight active conversation
+            btn_style = "border-left: 3px solid #19c37d !important; background: rgba(25,195,125,0.05) !important;" if is_active else ""
+            
+            if st.button(label, key=f"conv_{item['id']}", use_container_width=True, help=display_ts):
+                st.session_state.active_chat_id = item["id"]
+                st.session_state.show_welcome   = False
                 st.rerun()
 
         # ── Flex spacer pushes bottom section down ────────────
@@ -786,11 +931,10 @@ def _render_sidebar(user_email: str, user_name: str):
 
         # ── Sticky Fixed bottom ──────────────────────────────────────
         st.markdown('<div class="sidebar-bottom-sticky">', unsafe_allow_html=True)
-        st.markdown('<hr style="border-color:rgba(255,255,255,0.07);margin:6px 0;">', unsafe_allow_html=True)
 
         # User card
         st.markdown(f"""
-<div style="display:flex;align-items:center;gap:12px;padding:6px 0;">
+<div style="display:flex;align-items:center;gap:12px;">
   <div class="user-avatar" style="width:30px;height:30px;border-radius:50%;background:#19c37d;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;">{user_name[:2].upper()}</div>
   <div>
     <div style="font-size:13px;font-weight:600;font-family:'Space Grotesk',sans-serif;">{user_name}</div>
@@ -799,7 +943,7 @@ def _render_sidebar(user_email: str, user_name: str):
 </div>
 """, unsafe_allow_html=True)
 
-        if st.button("⭐  Upgrade to Pro", key="upgrade", use_container_width=True):
+        if st.button("⭐  Upgrade to Pro (Coming Soon)", key="upgrade", use_container_width=True):
             pass
 
         if st.button("🔒  Logout", key="logout", use_container_width=True):
@@ -835,7 +979,16 @@ def _reset_to_welcome():
 def _render_chat_messages(chats: list[dict]):
     """Render the full conversation as styled bubbles."""
     for chat in chats:
-        ts          = str(chat.get("timestamp", ""))[:16]
+        # Convert UTC to IST (+5:30)
+        try:
+            from datetime import datetime, timedelta
+            raw_ts = chat.get("timestamp", "")
+            dt = datetime.fromisoformat(raw_ts.replace(' ', 'T')) if ' ' in str(raw_ts) else datetime.fromisoformat(str(raw_ts))
+            ist_dt = dt + timedelta(hours=5, minutes=30)
+            ts = ist_dt.strftime("%b %d, %H:%M")
+        except:
+            ts = str(chat.get("timestamp", ""))[:16]
+
         model_used  = chat.get("model", "claude")
         model_label = "Claude Sonnet 4" if model_used == "claude" else "Gemini 2.5 Flash"
 
@@ -851,11 +1004,20 @@ def _render_chat_messages(chats: list[dict]):
         # AI bubble (left-aligned)
         # Convert newlines to <br> so multi-line responses display correctly
         response = chat["ai_response"].replace("\n", "<br>")
+        
+        # Determine if we show the model label (only for admins)
+        user_email = st.session_state.get("user")
+        from src.db import get_user
+        user = get_user(user_email) if user_email else None
+        show_model = user and user.get("role") == "admin"
+        
+        model_display = f"{model_label} · " if show_model else ""
+        
         st.markdown(
             f'<div class="bubble-wrap">'
             f'<div class="ai-bubble">{response}</div>'
             f'</div>'
-            f'<span class="model-label">{model_label} · {ts}</span>',
+            f'<span class="model-label">{model_display}{ts}</span>',
             unsafe_allow_html=True,
         )
 
@@ -869,11 +1031,20 @@ def _render_chat_messages(chats: list[dict]):
 
 def show_user_panel():
     """Render the full chat UI for a logged-in user."""
-    _apply_theme_css()
-
     user_email = st.session_state.user
     user       = get_user(user_email) or {}
     user_name  = user.get("name", "User")
+    is_admin   = user.get("role") == "admin"
+    
+    # Load assets for premium theme propagation
+    from src.auth import _get_base64_image
+    import os
+    img_path = os.path.join(os.path.dirname(__file__), "assets", "banner.png")
+    img_b64 = _get_base64_image(img_path)
+    bg_path = os.path.join(os.path.dirname(__file__), "assets", "background.png")
+    bg_b64  = _get_base64_image(bg_path)
+    
+    _apply_theme_css(img_b64, bg_b64, is_admin)
 
     _render_sidebar(user_email, user_name)
 
@@ -884,17 +1055,36 @@ def show_user_panel():
         chats = [c for c in chats if c.get("user_input", "").startswith(st.session_state.active_chat_filter)]
 
     # ── Welcome screen or chat history ────────────────────────
-    # Show welcome if manually requested, OR if there's no chat history at all for this view
-    if st.session_state.show_welcome or not chats:
-        st.markdown('<div class="welcome-title">Ready when you are.</div>',
+    # Show welcome ONLY if there is no active chat selected
+    if st.session_state.active_chat_id is None or st.session_state.show_welcome:
+        st.markdown('<div class="welcome-title">Welcome to ComradeAi</div>',
                     unsafe_allow_html=True)
+        
+        # Animated Hero UFO (with fallback to emoji if image is missing)
+        if img_b64:
+            st.markdown(f"""
+                <div class="hero-ufo-container">
+                    <img src="data:image/png;base64,{img_b64}" class="hero-ufo" alt="🛸">
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+                <div class="hero-ufo-container">
+                    <div class="hero-ufo" style="font-size: 8rem; display: flex; justify-content: center; align-items: center;">🛸</div>
+                </div>
+            """, unsafe_allow_html=True)
+        
         st.markdown(
-            '<div class="welcome-sub">Powered by Claude Sonnet 4 &amp; Gemini 2.5 Flash</div>',
+            '<div class="welcome-sub">👋🏻hello!</div>',
             unsafe_allow_html=True,
         )
     else:
-        st.session_state.show_welcome = False
-        _render_chat_messages(chats)
+        # Filter all_chats by the active session ID
+        active_chats = [c for c in chats if c.get("conversation_id") == st.session_state.active_chat_id or 
+                       (not c.get("conversation_id") and st.session_state.active_chat_id == "legacy_" + str(c["id"]))]
+        
+        # We want the bubbles chronologically for a specific conversation
+        _render_chat_messages(sorted(active_chats, key=lambda x: x["timestamp"]))
 
     st.markdown("---")
 
@@ -917,27 +1107,25 @@ def show_user_panel():
                 st.rerun()
 
     # ── FIXED BOTTOM CHAT CONTROLS ────────────────────────────
-    # Add a spacer so the chat messages don't get hidden behind the sticky footer
-    st.markdown('<div class="chat-spacer"></div>', unsafe_allow_html=True)
-    
     bottom_container = st.container()
     with bottom_container:
         # ── Model selector + file uploader (same row) ─────────────
-        col_model, col_spacer, col_upload = st.columns([5, 3, 2])
-
-        with col_model:
-            # Model selection with ^ button label
-            with st.popover(f"Model: {st.session_state.model.title()}  ", use_container_width=True):
-                new_model = st.radio(
-                    "Switch AI Model",
-                    options=["claude", "gemini"],
-                    format_func=lambda x: "✦ Claude Sonnet 4" if x == "claude" else "◆ Gemini 2.5 Flash",
-                    index=0 if st.session_state.model == "claude" else 1,
-                    key="pop_model_select"
-                )
-                if new_model != st.session_state.model:
-                    st.session_state.model = new_model
-                    st.rerun()
+        if is_admin:
+            col_model, col_spacer, col_upload = st.columns([5, 3, 2])
+            with col_model:
+                with st.popover(f"Model: {st.session_state.model.title()}  ", use_container_width=True):
+                    new_model = st.radio(
+                        "Switch AI Model",
+                        options=["claude", "gemini"],
+                        format_func=lambda x: "✦ Claude Sonnet 4" if x == "claude" else "◆ Gemini 2.5 Flash",
+                        index=0 if st.session_state.model == "claude" else 1,
+                        key="pop_model_select"
+                    )
+                    if new_model != st.session_state.model:
+                        st.session_state.model = new_model
+                        st.rerun()
+        else:
+            col_spacer, col_upload = st.columns([8, 2])
 
         with col_upload:
             with st.popover("📎 Attach File", use_container_width=True):
@@ -963,7 +1151,8 @@ def show_user_panel():
         # ── Message input area ─────────────────────────────────
 
         # ── Message input (Enter to send) ─────────────────────────
-        st.markdown(f'<div class="chat-model-indicator">{st.session_state.model}</div>', unsafe_allow_html=True)
+        if is_admin:
+            st.markdown(f'<div class="chat-model-indicator">{st.session_state.model}</div>', unsafe_allow_html=True)
         
         prefill = st.session_state.get("pending_prompt", "")
         if prefill:
@@ -988,7 +1177,7 @@ def show_user_panel():
 
         st.markdown(
             '<div class="chat-footer">'
-            'Wingman AI can make mistakes. Verify important information. See Cookie Preferences.'
+            'ComradeAi can make mistakes. Verify important information.'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -1047,6 +1236,12 @@ def _process_message(text: str, user_email: str, chats: list[dict]):
             "text": st.session_state.active_file_text,
         }]
 
+    # Assign or generate a conversation ID
+    if st.session_state.active_chat_id is None:
+        import uuid
+        st.session_state.active_chat_id = str(uuid.uuid4())
+        st.session_state.show_welcome = False
+
     with st.spinner(""):
         ai_reply = ai_chat_response(
             prompt,
@@ -1054,7 +1249,14 @@ def _process_message(text: str, user_email: str, chats: list[dict]):
             file_contexts=file_contexts,
         )
 
-    save_chat(user_email, text, ai_reply, model=st.session_state.model, project_id=st.session_state.active_project_id)
+    save_chat(
+        user_email, 
+        text, 
+        ai_reply, 
+        model=st.session_state.model, 
+        project_id=st.session_state.active_project_id,
+        conversation_id=st.session_state.active_chat_id
+    )
     st.rerun()
 
 

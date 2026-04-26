@@ -57,9 +57,9 @@ def send_verification_email(to_email: str, token: str) -> bool:
     base_url = st.secrets.get("BASE_URL", "http://localhost:8501")
     link     = f"{base_url}/?verify_token={quote(token)}"
 
-    subject = "Verify your Wingman AI account"
+    subject = "Verify your ComradeAi account"
     body = f"""
-        <h2>Welcome to Wingman AI 🤖</h2>
+        <h2>Welcome to ComradeAi 🤖</h2>
         <p>Click the button below to verify your email and activate your account.</p>
         <p>
           <a href="{link}"
@@ -84,7 +84,7 @@ def send_reset_email(to_email: str, token: str) -> bool:
     base_url = st.secrets.get("BASE_URL", "http://localhost:8501")
     link     = f"{base_url}/?reset_token={quote(token)}"
 
-    subject = "Reset your Wingman AI password"
+    subject = "Reset your ComradeAi password"
     body = f"""
         <h2>Password Reset Request</h2>
         <p>Click the button below to set a new password for your account.</p>

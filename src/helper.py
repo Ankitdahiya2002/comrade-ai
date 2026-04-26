@@ -36,7 +36,16 @@ if GEMINI_KEY:
         print(f"Gemini init failed: {e}")
 
 # Max characters of file text sent to the AI per message
-MAX_FILE_CHARS = 12_000
+MAX_FILE_CHARS = 100_000
+
+# ── Point-to-Point System Instructions ──────────────
+POINT_TO_POINT_SYSTEM_INSTRUCTION = (
+    "You are a highly precise and direct technical assistant. "
+    "Provide strictly point-to-point information. Eliminate ALL conversational filler, "
+    "greetings ('Hello!', 'I'm happy to help'), and concluding remarks. "
+    "Start your response immediately with the answer. "
+    "Only provide deep, background, or multi-step information if the user explicitly asks for 'deep', 'detailed', or 'in-depth' content."
+)
 
 
 # =============================================================
@@ -64,16 +73,19 @@ def ai_chat_response(
     -------
     str : The AI's response text.
     """
+    # Detect if user wants "deep" or "detailed" info
+    is_deep = bool(re.search(r"\b(deep|detailed|in-depth|exhaustive|elaborate|comprehensive|explain in detail)\b", prompt, re.I))
+    
     # Build the full prompt (file context + conversation)
     full_prompt = _build_prompt(prompt, file_contexts or [])
 
     # Route to the correct model
     if model_choice == "gemini":
-        return _call_gemini(full_prompt)
+        return _call_gemini(full_prompt, is_deep)
 
     # Claude is the default — try it first
     if ANTHROPIC_KEY:
-        result = _call_claude(full_prompt)
+        result = _call_claude(full_prompt, is_deep)
         if not result.startswith("⚠️"):
             return result
         # Claude failed → fall back to Gemini automatically
@@ -93,9 +105,13 @@ def ai_chat_response(
 # PRIVATE — Claude and Gemini callers
 # =============================================================
 
-def _call_claude(prompt: str) -> str:
+def _call_claude(prompt: str, is_deep: bool = False) -> str:
     """Call Claude Sonnet 4 via the Anthropic REST API."""
     try:
+        system_instruction = POINT_TO_POINT_SYSTEM_INSTRUCTION
+        if is_deep:
+            system_instruction += " DEEP MODE: The user has requested detailed information. Be comprehensive and thorough."
+
         response = requests.post(
             "https://api.anthropic.com/v1/messages",
             headers={
@@ -105,7 +121,8 @@ def _call_claude(prompt: str) -> str:
             },
             json={
                 "model":      "claude-sonnet-4-5",
-                "max_tokens": 1024,
+                "max_tokens": 4096,
+                "system":      system_instruction,
                 "messages":   [{"role": "user", "content": prompt}],
             },
             timeout=30,
@@ -117,12 +134,19 @@ def _call_claude(prompt: str) -> str:
         return f"⚠️ Claude request failed: {e}"
 
 
-def _call_gemini(prompt: str) -> str:
+def _call_gemini(prompt: str, is_deep: bool = False) -> str:
     """Call Gemini 2.5 Flash via the google-generativeai SDK."""
     if not _genai:
         return "⚠️ Gemini is not configured. Add GEMINI_API_KEY to secrets."
     try:
-        model    = _genai.GenerativeModel("models/gemini-2.5-flash")
+        system_instruction = POINT_TO_POINT_SYSTEM_INSTRUCTION
+        if is_deep:
+            system_instruction += " DEEP MODE: The user has requested detailed information. Be comprehensive and thorough."
+
+        model    = _genai.GenerativeModel(
+            "models/gemini-2.5-flash", 
+            system_instruction=system_instruction
+        )
         response = model.generate_content({"parts": [{"text": prompt}]})
         return response.text.strip()
     except Exception as e:

@@ -1,13 +1,14 @@
 [theme]
-base            = "dark"
-backgroundColor      = "#8181c3ff"
-secondaryBackgroundColor = "#767b7cff"
-textColor            = "#e8e6f0"
-primaryColor         = "#7bb59dff"
-font                 = "sans serif"
+base                    = "dark"
+backgroundColor         = "#020617"
+secondaryBackgroundColor = "#0f172a"
+textColor               = "#f8fafc"
+primaryColor            = "#3b82f6"
+font                    = "sans serif"
 
 [server]
 headless = true
+maxMessageSize = 200 # MB, effectively unlimited for text
 
 [browser]
 gatherUsageStats = false

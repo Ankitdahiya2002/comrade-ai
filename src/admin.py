@@ -35,7 +35,7 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 [data-testid="stSidebar"] * { color: #c8c6e8 !important; }
 
-#MainMenu, footer, header,
+#MainMenu, footer,
 [data-testid="stToolbar"],
 .stDeployButton { display: none !important; }
 
@@ -94,7 +94,7 @@ def show_admin_panel():
     from datetime import datetime
     st.markdown(
         f'<div class="admin-bar">'
-        f'<span>⚙️  Wingman AI — Admin Panel</span>'
+        f'<span>⚙️  ComradeAi — Admin Panel</span>'
         f'<span>{admin_email} &nbsp;|&nbsp; {datetime.now().strftime("%Y-%m-%d %H:%M")}</span>'
         f'</div>',
         unsafe_allow_html=True,
@@ -205,8 +205,10 @@ def _user_management_tab(all_users: list[dict]):
                 ):
                     for chat in chats[-20:]:  # Show latest 20
                         ts = str(chat.get("timestamp", ""))[:16]
+                        mu = chat.get("model", "claude")
+                        ml = "Claude" if mu == "claude" else "Gemini"
                         st.markdown(
-                            f"**{ts}**  \n"
+                            f"**{ts}** &nbsp; | &nbsp; ⚙️ `{ml}`  \n"
                             f"👤 {chat['user_input']}  \n"
                             f"🤖 {chat['ai_response']}"
                         )
@@ -265,8 +267,8 @@ def _email_tab():
         else:
             ok = _send_email(
                 recipient,
-                "Test email from Wingman AI",
-                "<p>This is a test email sent from the Wingman AI admin panel. "
+                "Test email from ComradeAi",
+                "<p>This is a test email sent from the ComradeAi admin panel. "
                 "Your SMTP configuration is working correctly.</p>",
             )
             if ok:

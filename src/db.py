@@ -46,7 +46,7 @@ _SQLITE_FILE = "wingman.db"
 # SUPABASE CLIENT HELPERS
 # =============================================================
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def _db() -> "SupabaseClient":
     """
     Return the Supabase client using the anon key.
@@ -55,7 +55,7 @@ def _db() -> "SupabaseClient":
     return create_client(_URL, _KEY)
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def _admin_db() -> "SupabaseClient":
     """
     Return the Supabase client using the service-role key.
@@ -126,12 +126,14 @@ def _sqlite_create_tables():
 
     c.execute("""
         CREATE TABLE IF NOT EXISTS chats (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_email  TEXT,
-            user_input  TEXT,
-            ai_response TEXT,
-            model       TEXT DEFAULT 'claude',
-            timestamp   DATETIME DEFAULT CURRENT_TIMESTAMP,
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_email      TEXT,
+            user_input      TEXT,
+            ai_response     TEXT,
+            model           TEXT DEFAULT 'claude',
+            timestamp       DATETIME DEFAULT CURRENT_TIMESTAMP,
+            project_id      INTEGER,
+            conversation_id TEXT,
             FOREIGN KEY (user_email) REFERENCES users(email)
         )
     """)
@@ -188,6 +190,11 @@ def safe_initialize():
         conn = _sqlite()
         try:
             conn.execute("ALTER TABLE chats ADD COLUMN project_id INTEGER")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass # Column already exists
+        try:
+            conn.execute("ALTER TABLE chats ADD COLUMN conversation_id TEXT")
             conn.commit()
         except sqlite3.OperationalError:
             pass # Column already exists
@@ -295,7 +302,7 @@ def upsert_oauth_user(email: str, name: str, provider: str) -> dict:
     return get_user(email)
 
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=600, show_spinner=False)
 def get_user(email: str) -> dict | None:
     """Return a user dict by email, or None if not found."""
     user = None
@@ -553,7 +560,7 @@ def create_project(user_email: str, name: str) -> dict:
     return {"id": project_id, "user_email": user_email, "name": name}
 
 
-@st.cache_data(ttl=900)
+@st.cache_data(ttl=900, show_spinner=False)
 def get_user_projects(user_email: str) -> list[dict]:
     """Get all projects for a given user."""
     if _USE_SUPABASE:
@@ -591,7 +598,8 @@ def delete_project(project_id: int):
 
 
 def save_chat(user_email: str, user_input: str,
-              ai_response: str, model: str = "claude", project_id: int = None):
+              ai_response: str, model: str = "claude", 
+              project_id: int = None, conversation_id: str = None):
     """Save one message exchange (user + AI reply) to the database."""
     # Bust the chat cache so the new message appears instantly
     st.cache_data.clear()
@@ -605,43 +613,50 @@ def save_chat(user_email: str, user_input: str,
         }
         if project_id is not None:
             data["project_id"] = project_id
+        if conversation_id is not None:
+            data["conversation_id"] = conversation_id
+            
         _admin_db().table("chats").insert(data).execute()
         return
 
     conn = _sqlite()
     c = conn.cursor()
     c.execute("""
-        INSERT INTO chats (user_email, user_input, ai_response, model, project_id)
-        VALUES (?, ?, ?, ?, ?)
-    """, (user_email, user_input, ai_response, model, project_id))
+        INSERT INTO chats (user_email, user_input, ai_response, model, project_id, conversation_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (user_email, user_input, ai_response, model, project_id, conversation_id))
     conn.commit()
     conn.close()
 
 
-@st.cache_data(ttl=300)
-def get_user_chats(user_email: str, project_id: int = None) -> list[dict]:
-    """Return all chats for a user, oldest first."""
+@st.cache_data(ttl=300, show_spinner=False)
+def get_user_chats(user_email: str, project_id: int = None, conversation_id: str = None) -> list[dict]:
+    """Return all chats for a user, newest first."""
     if _USE_SUPABASE:
         query = _admin_db().table("chats").select("*").eq("user_email", user_email)
         if project_id is not None:
             query = query.eq("project_id", project_id)
-        # 1. To get unassigned chats, user must specify. E.g. we don't strict filter unless asked.
-        # 2. Add resilience wrapper
-        res = _safe_supabase_execute(query.order("timestamp", desc=False))
+        if conversation_id is not None:
+            query = query.eq("conversation_id", conversation_id)
+        
+        # Add resilience wrapper
+        res = _safe_supabase_execute(query.order("timestamp", desc=True))
         return res.data or []
 
     conn = _sqlite()
     c = conn.cursor()
+    sql = "SELECT * FROM chats WHERE user_email = ?"
+    params = [user_email]
+    
     if project_id is not None:
-        c.execute(
-            "SELECT * FROM chats WHERE user_email = ? AND project_id = ? ORDER BY timestamp ASC",
-            (user_email, project_id)
-        )
-    else:
-        c.execute(
-            "SELECT * FROM chats WHERE user_email = ? ORDER BY timestamp ASC",
-            (user_email,)
-        )
+        sql += " AND project_id = ?"
+        params.append(project_id)
+    if conversation_id is not None:
+        sql += " AND conversation_id = ?"
+        params.append(conversation_id)
+        
+    sql += " ORDER BY timestamp DESC"
+    c.execute(sql, tuple(params))
     rows = c.fetchall()
     conn.close()
     return [dict(r) for r in rows]
@@ -717,7 +732,7 @@ def save_uploaded_file(user_email: str, file_name: str,
     conn.close()
 
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=600, show_spinner=False)
 def get_uploaded_files(user_email: str) -> list[dict]:
     """Return all files uploaded by a user, newest first."""
     if _USE_SUPABASE:
