@@ -29,11 +29,19 @@ html, body, [data-testid="stAppViewContainer"] {
     color: #e8e6f0 !important;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
 }
+[data-testid="stSidebar"] {
+    display: flex !important;
+}
 [data-testid="stSidebar"] > div:first-child {
     background: #0a0a14 !important;
     border-right: 1px solid #2e2e48 !important;
 }
 [data-testid="stSidebar"] * { color: #c8c6e8 !important; }
+
+header, [data-testid="stHeader"] {
+    display: flex !important;
+    background: transparent !important;
+}
 
 #MainMenu, footer,
 [data-testid="stToolbar"],

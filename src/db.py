@@ -20,6 +20,7 @@ import io
 import time
 from datetime import datetime, timedelta, timezone
 
+from typing import Optional
 import pandas as pd
 import streamlit as st
 
@@ -303,7 +304,7 @@ def upsert_oauth_user(email: str, name: str, provider: str) -> dict:
 
 
 @st.cache_data(ttl=600, show_spinner=False)
-def get_user(email: str) -> dict | None:
+def get_user(email: str) -> Optional[dict]:
     """Return a user dict by email, or None if not found."""
     user = None
     if _USE_SUPABASE:

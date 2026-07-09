@@ -157,8 +157,13 @@ def _apply_theme_css(img_b64="", bg_b64="", is_admin: bool = False):
 }}
 
 /* ── Sidebar Navigation Toggle (Keep Visible) ── */
-header {{ background: transparent !important; }}
-[data-testid="stHeader"] {{ background: transparent !important; }}
+header, [data-testid="stHeader"] {{
+    display: flex !important;
+    background: transparent !important;
+}}
+[data-testid="stSidebar"] {{
+    display: flex !important;
+}}
 .stAppDeployButton, [data-testid="stStatusWidget"], [data-testid="stToolbar"] {{ display: none !important; }}
 [data-testid="stSidebarCollapseButton"] {{
     height: 0.75rem !important;

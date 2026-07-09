@@ -11,6 +11,7 @@ wingman.db
 # Python
 projectenv/
 venv/
+.venv/
 env/
 __pycache__/
 *.pyc
