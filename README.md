@@ -97,4 +97,7 @@ The core AI logic in `src/helper.py` follows a priority-based routing:
 ---
 
 ## 📜 License
-Internal use only. Part of the Wingman project suite.
+Internal use only. Part of the ComradeAi project suite.
+##
+Conncet via dahiyaankit38@gmail.com
+
